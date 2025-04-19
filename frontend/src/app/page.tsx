@@ -15,29 +15,62 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { MoreHorizontal } from "lucide-react";
+import { toast } from "sonner";
 
 interface Song {
-  id: number;
+  id: string;
   title: string;
-  author: string;
-  fileUrl: string; // URL của file nhạc
-  imageUrl?: string; // URL của ảnh đại diện bài hát
-  duration?: string; // Thời gian bài hát (mm:ss)
+  userId: string;
+  duration: number;
+  albumId?: string;
+  releaseCategoryId?: string;
+  fileUrl: string;
+  imageUrl?: string;
+  createdAt: string;
 }
 
 export default function Home() {
+  // Fix cứng userId
+  const userId = "user-123";
+
   const [songs, setSongs] = useState<Song[]>([]);
   const [songTitle, setSongTitle] = useState<string>("");
-  const [songAuthor, setSongAuthor] = useState<string>("");
-  const [editSongId, setEditSongId] = useState<number | null>(null);
+  const [songDuration, setSongDuration] = useState<number>(0);
+  const [albumId, setAlbumId] = useState<string>("");
+  const [releaseCategoryId, setReleaseCategoryId] = useState<string>("");
+  const [editSongId, setEditSongId] = useState<string | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState<boolean>(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState<boolean>(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState<boolean>(false);
+  const [selectedSongId, setSelectedSongId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const editFileInputRef = useRef<HTMLInputElement>(null);
   const editImageInputRef = useRef<HTMLInputElement>(null);
+
+  // Lấy danh sách bài hát khi component mount
+  useEffect(() => {
+    fetchSongs();
+  }, []);
+
+  const fetchSongs = async () => {
+    try {
+      const response = await fetch("/api/songs");
+      if (response.ok) {
+        const data = await response.json();
+        setSongs(data);
+      } else {
+        throw new Error("Failed to fetch songs");
+      }
+    } catch (error: any) {
+      toast.error("Lỗi", {
+        description: error.message || "Không thể lấy dữ liệu",
+        duration: 2000,
+      });
+    }
+  };
 
   // Hàm định dạng thời gian từ giây sang mm:ss
   const formatDuration = (duration: number): string => {
@@ -47,125 +80,152 @@ export default function Home() {
   };
 
   // Thêm bài hát mới
-  const handleAddSong = () => {
-    if (
-      fileInputRef.current?.files &&
-      fileInputRef.current.files[0] &&
-      songTitle &&
-      songAuthor
-    ) {
-      const file = fileInputRef.current.files[0];
-      const fileUrl = URL.createObjectURL(file);
-      const imageFile = imageInputRef.current?.files?.[0];
-      const imageUrl = imageFile ? URL.createObjectURL(imageFile) : undefined;
-
-      // Tạo audio element tạm để lấy metadata
-      const audio = new Audio(fileUrl);
-      audio.addEventListener("loadedmetadata", () => {
-        const duration = formatDuration(audio.duration);
-        const newSong: Song = {
-          id: songs.length + 1,
-          title: songTitle,
-          author: songAuthor,
-          fileUrl,
-          imageUrl,
-          duration,
-        };
-        setSongs([...songs, newSong]);
-        // Reset input và đóng dialog
-        setSongTitle("");
-        setSongAuthor("");
-        fileInputRef.current!.value = "";
-        if (imageInputRef.current) imageInputRef.current.value = "";
-        setIsAddDialogOpen(false);
+  const handleAddSong = async () => {
+    if (!songTitle || !songDuration || !fileInputRef.current?.files?.[0]) {
+      toast.error("Lỗi", {
+        description: "Vui lòng nhập đầy đủ thông tin bắt buộc",
+        duration: 2000,
       });
-
-      audio.addEventListener("error", () => {
-        alert("File nhạc không hợp lệ hoặc không được hỗ trợ!");
-      });
-    } else {
-      alert("Vui lòng nhập đầy đủ thông tin và chọn file nhạc!");
+      return;
     }
-  };
 
-  // Xóa bài hát
-  const handleDeleteSong = (id: number) => {
-    setSongs(songs.filter((song) => song.id !== id));
+    const formData = new FormData();
+    formData.append("title", songTitle);
+    formData.append("userId", userId);
+    formData.append("duration", songDuration.toString());
+    if (albumId) formData.append("albumId", albumId);
+    if (releaseCategoryId)
+      formData.append("releaseCategoryId", releaseCategoryId);
+    formData.append("file", fileInputRef.current.files[0]);
+    if (imageInputRef.current?.files?.[0])
+      formData.append("image", imageInputRef.current.files[0]);
+
+    try {
+      const response = await fetch("/api/songs", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (response.ok) {
+        const newSong = await response.json();
+        setSongs([...songs, newSong]);
+        resetForm();
+        setIsAddDialogOpen(false);
+        toast.success("Thành công", {
+          description: "Bài hát đã được thêm thành công",
+          duration: 2000,
+        });
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to add song");
+      }
+    } catch (error: any) {
+      toast.error("Lỗi", {
+        description: error.message || "Có lỗi xảy ra khi thêm bài hát",
+        duration: 2000,
+      });
+    }
   };
 
   // Sửa bài hát
   const handleEditSong = (song: Song) => {
     setEditSongId(song.id);
     setSongTitle(song.title);
-    setSongAuthor(song.author);
+    setSongDuration(song.duration);
+    setAlbumId(song.albumId || "");
+    setReleaseCategoryId(song.releaseCategoryId || "");
     setIsEditDialogOpen(true);
   };
 
   // Cập nhật bài hát sau khi sửa
-  const handleUpdateSong = () => {
-    if (editSongId !== null && songTitle && songAuthor) {
-      let newFileUrl = songs.find((song) => song.id === editSongId)!.fileUrl;
-      let newImageUrl = songs.find((song) => song.id === editSongId)!.imageUrl;
-      let newDuration = songs.find((song) => song.id === editSongId)!.duration;
+  const handleUpdateSong = async () => {
+    if (!editSongId || !songTitle || !songDuration) {
+      toast.error("Lỗi", {
+        description: "Vui lòng nhập đầy đủ thông tin bắt buộc",
+        duration: 2000,
+      });
+      return;
+    }
 
-      // Kiểm tra nếu có file nhạc mới
-      if (
-        editFileInputRef.current?.files &&
-        editFileInputRef.current.files[0]
-      ) {
-        const file = editFileInputRef.current.files[0];
-        newFileUrl = URL.createObjectURL(file);
+    const formData = new FormData();
+    formData.append("title", songTitle);
+    formData.append("userId", userId);
+    formData.append("duration", songDuration.toString());
+    if (albumId) formData.append("albumId", albumId);
+    if (releaseCategoryId)
+      formData.append("releaseCategoryId", releaseCategoryId);
+    if (editFileInputRef.current?.files?.[0])
+      formData.append("file", editFileInputRef.current.files[0]);
+    if (editImageInputRef.current?.files?.[0])
+      formData.append("image", editImageInputRef.current.files[0]);
 
-        // Lấy metadata của file mới
-        const audio = new Audio(newFileUrl);
-        audio.addEventListener("loadedmetadata", () => {
-          newDuration = formatDuration(audio.duration);
-          updateSong(newFileUrl, newImageUrl, newDuration);
-        });
+    try {
+      const response = await fetch(`/api/songs/${editSongId}`, {
+        method: "PUT",
+        body: formData,
+      });
 
-        audio.addEventListener("error", () => {
-          alert("File nhạc không hợp lệ hoặc không được hỗ trợ!");
+      if (response.ok) {
+        const updatedSong = await response.json();
+        setSongs(
+          songs.map((song) => (song.id === editSongId ? updatedSong : song))
+        );
+        resetForm();
+        setIsEditDialogOpen(false);
+        toast.success("Thành công", {
+          description: "Bài hát đã được cập nhật thành công",
+          duration: 2000,
         });
       } else {
-        // Kiểm tra nếu có ảnh mới
-        if (
-          editImageInputRef.current?.files &&
-          editImageInputRef.current.files[0]
-        ) {
-          newImageUrl = URL.createObjectURL(editImageInputRef.current.files[0]);
-        }
-        updateSong(newFileUrl, newImageUrl, newDuration);
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to update song");
       }
-    } else {
-      alert("Vui lòng nhập đầy đủ thông tin!");
+    } catch (error: any) {
+      toast.error("Lỗi", {
+        description: error.message || "Có lỗi xảy ra khi cập nhật bài hát",
+        duration: 2000,
+      });
     }
   };
 
-  const updateSong = (
-    fileUrl: string,
-    imageUrl: string | undefined,
-    duration: string | undefined
-  ) => {
-    setSongs(
-      songs.map((song) =>
-        song.id === editSongId
-          ? {
-              ...song,
-              title: songTitle,
-              author: songAuthor,
-              fileUrl,
-              imageUrl,
-              duration,
-            }
-          : song
-      )
-    );
-    setEditSongId(null);
+  // Xóa bài hát
+  const handleDeleteSong = async () => {
+    if (!selectedSongId) return;
+
+    try {
+      const response = await fetch(`/api/songs/${selectedSongId}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        setSongs(songs.filter((song) => song.id !== selectedSongId));
+        setIsDeleteDialogOpen(false);
+        toast.success("Thành công", {
+          description: "Bài hát đã được xóa thành công",
+          duration: 2000,
+        });
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to delete song");
+      }
+    } catch (error: any) {
+      toast.error("Lỗi", {
+        description: error.message || "Có lỗi xảy ra khi xóa bài hát",
+        duration: 2000,
+      });
+    }
+  };
+
+  const resetForm = () => {
     setSongTitle("");
-    setSongAuthor("");
+    setSongDuration(0);
+    setAlbumId("");
+    setReleaseCategoryId("");
+    setEditSongId(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (imageInputRef.current) imageInputRef.current.value = "";
     if (editFileInputRef.current) editFileInputRef.current.value = "";
     if (editImageInputRef.current) editImageInputRef.current.value = "";
-    setIsEditDialogOpen(false);
   };
 
   return (
@@ -187,7 +247,7 @@ export default function Home() {
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
               <Button className="bg-blue-500 text-white hover:bg-blue-600 transition duration-300">
-                Thêm bài hát
+                Tải nhạc lên
               </Button>
             </DialogTrigger>
             <DialogContent>
@@ -197,7 +257,7 @@ export default function Home() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">
-                    Tên bài hát
+                    Tên bài hát *
                   </label>
                   <Input
                     type="text"
@@ -210,20 +270,46 @@ export default function Home() {
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">
-                    Tên tác giả
+                    Thời lượng (giây) *
                   </label>
                   <Input
-                    type="text"
-                    placeholder="Nhập tên tác giả"
-                    value={songAuthor}
-                    onChange={(e) => setSongAuthor(e.target.value)}
+                    type="number"
+                    placeholder="Nhập thời lượng"
+                    value={songDuration}
+                    onChange={(e) => setSongDuration(Number(e.target.value))}
                     className="border-blue-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white text-blue-900 placeholder-blue-400"
                   />
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">
-                    File bài hát
+                    Mã album
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="Nhập mã album"
+                    value={albumId}
+                    onChange={(e) => setAlbumId(e.target.value)}
+                    className="border-blue-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white text-blue-900 placeholder-blue-400"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">
+                    Mã danh mục phát hành
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="Nhập mã danh mục"
+                    value={releaseCategoryId}
+                    onChange={(e) => setReleaseCategoryId(e.target.value)}
+                    className="border-blue-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white text-blue-900 placeholder-blue-400"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">
+                    File bài hát *
                   </label>
                   <Input
                     type="file"
@@ -250,7 +336,7 @@ export default function Home() {
                   onClick={handleAddSong}
                   className="bg-blue-500 text-white hover:bg-blue-600 transition duration-300 w-full"
                 >
-                  Thêm
+                  Lưu
                 </Button>
               </div>
             </DialogContent>
@@ -281,7 +367,14 @@ export default function Home() {
                 )}
                 <div>
                   <p className="font-medium text-blue-900">{song.title}</p>
-                  <p className="text-sm text-blue-500">{song.author}</p>
+                  <p className="text-sm text-blue-500">
+                    Thời lượng: {formatDuration(song.duration)}
+                  </p>
+                  {song.albumId && (
+                    <p className="text-sm text-gray-500">
+                      Album: {song.albumId}
+                    </p>
+                  )}
                   <div className="flex items-center space-x-2 mt-2">
                     <audio
                       controls
@@ -289,11 +382,6 @@ export default function Home() {
                       preload="metadata"
                       className="w-full"
                     ></audio>
-                    {song.duration && (
-                      <span className="text-sm text-gray-500">
-                        {song.duration}
-                      </span>
-                    )}
                   </div>
                 </div>
               </div>
@@ -308,7 +396,13 @@ export default function Home() {
                     <DropdownMenuItem onClick={() => handleEditSong(song)}>
                       Sửa
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleDeleteSong(song.id)}>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setSelectedSongId(song.id);
+                        setIsDeleteDialogOpen(true);
+                      }}
+                      className="text-red-500"
+                    >
                       Xóa
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -328,7 +422,7 @@ export default function Home() {
           <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">
-                Tên bài hát
+                Tên bài hát *
               </label>
               <Input
                 type="text"
@@ -341,13 +435,39 @@ export default function Home() {
 
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">
-                Tên tác giả
+                Thời lượng (giây) *
+              </label>
+              <Input
+                type="number"
+                placeholder="Nhập thời lượng"
+                value={songDuration}
+                onChange={(e) => setSongDuration(Number(e.target.value))}
+                className="border-blue-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white text-blue-900 placeholder-blue-400"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">
+                Mã album
               </label>
               <Input
                 type="text"
-                placeholder="Nhập tên tác giả"
-                value={songAuthor}
-                onChange={(e) => setSongAuthor(e.target.value)}
+                placeholder="Nhập mã album"
+                value={albumId}
+                onChange={(e) => setAlbumId(e.target.value)}
+                className="border-blue-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white text-blue-900 placeholder-blue-400"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">
+                Mã danh mục phát hành
+              </label>
+              <Input
+                type="text"
+                placeholder="Nhập mã danh mục"
+                value={releaseCategoryId}
+                onChange={(e) => setReleaseCategoryId(e.target.value)}
                 className="border-blue-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white text-blue-900 placeholder-blue-400"
               />
             </div>
@@ -388,6 +508,29 @@ export default function Home() {
             >
               Cập nhật
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog xác nhận xóa */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Xác nhận xóa bài hát</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p>Bạn có chắc chắn muốn xóa bài hát này không?</p>
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsDeleteDialogOpen(false)}
+              >
+                Hủy
+              </Button>
+              <Button variant="destructive" onClick={handleDeleteSong}>
+                Xóa
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
