@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Storage;
 
 class SongService {
     public function getAllSongs() {
-        return Song::all();
+        return Song::with('file')->get();
     }
 
     public function createSong($data) {

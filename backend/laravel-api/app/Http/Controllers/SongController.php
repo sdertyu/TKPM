@@ -15,14 +15,18 @@ class SongController extends Controller
     }
     public function index()
     {
-        // Fetch songs from the database or any other source
-        $songs = [
-            ['id' => 1, 'title' => 'Song 1', 'artist' => 'Artist 1'],
-            ['id' => 2, 'title' => 'Song 2', 'artist' => 'Artist 2'],
-            // Add more songs as needed
-        ];
-
-        return response()->json($songs);
+        try {
+            $songs = $this->songService->getAllSongs();
+            return response()->json([
+                'message' => 'Songs retrieved successfully',
+                'songs' => $songs,
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error retrieving songs',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
 
     public function create(Request $request)
