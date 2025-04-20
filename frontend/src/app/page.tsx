@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect } from 'react';
+import React, { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -52,51 +52,56 @@ export default function Home() {
     if (
       fileInputRef.current?.files &&
       fileInputRef.current.files[0] &&
-      songTitle &&
-      songAuthor
+      songTitle
     ) {
       const file = fileInputRef.current.files[0];
-      console.log(file)
+      console.log(file);
       const imageFile = imageInputRef.current?.files?.[0];
-  
+
       const fileUrl = URL.createObjectURL(file);
       const imageUrl = imageFile ? URL.createObjectURL(imageFile) : undefined;
-  
+
       const audio = new Audio(fileUrl);
-  
+
       audio.addEventListener("loadedmetadata", async () => {
         const duration = formatDuration(audio.duration);
-  
+
         // ✅ Gửi lên server (nếu cần)
         const formData = new FormData();
         formData.append("songName", songTitle);
-        formData.append("author", songAuthor); // nếu backend có
+        formData.append("author", "5"); // ID người dùng cố định
         formData.append("duration", Math.floor(audio.duration).toString());
         formData.append("file", file);
         formData.append("idAlbum", "1");
-        formData.append("releaseCategoryId","1");
+        formData.append("releaseCategoryId", "1");
         if (imageFile) formData.append("image", imageFile); // nếu có image
-  
+
         try {
-          const response = await fetch("http://127.0.0.1:8000/api/songs/create", {
-            method: "POST",
-            body: formData,
-          });
-  
+          const response = await fetch(
+            "http://127.0.0.1:8000/api/songs/create",
+            {
+              method: "POST",
+              body: formData,
+            }
+          );
+
           const data = await response.json();
           if (data.message === "Song created successfully") {
-            const newSong: Song = {
-              id: data.song.SongID, // giả sử server trả về bài hát mới
-              title: data.song.Title,
-              author: data.song.Title,
-              fileUrl: `http://localhost:8000/storage/` + data.song.file?.Path || fileUrl,
-              imageUrl: imageUrl || "", 
-              duration: data.song.Duration.toString(),
-            };
-  
-            setSongs([...songs, newSong]);
+            // const newSong: Song = {
+            //   id: data.song.SongID, // giả sử server trả về bài hát mới
+            //   title: data.song.Title,
+            //   author: data.song.FullName,
+            //   fileUrl:
+            //     `http://localhost:8000/storage/` + data.song.file?.Path ||
+            //     fileUrl,
+            //   imageUrl: imageUrl || "",
+            //   duration: data.song.Duration.toString(),
+            // };
+
+            // setSongs([...songs, newSong]);
             alert("Đã thêm bài hát!");
-  
+            fetchSongs(); // Cập nhật danh sách bài hát sau khi thêm thành công
+
             // Reset form
             setSongTitle("");
             setSongAuthor("");
@@ -108,41 +113,41 @@ export default function Home() {
           }
         } catch (error) {
           console.error("Error adding song:", error);
-          alert("Có lỗi xảy ra khi thêm bài hát.");
+          alert("Có lỗi xảy ra khi thêm bài hát: " + (error.response?.data?.message || error.message));
         }
       });
-  
+
       audio.addEventListener("error", () => {
         alert("File nhạc không hợp lệ hoặc không được hỗ trợ!");
       });
     } else {
-      alert("Vui lòng nhập đầy đủ thông tin và chọn file nhạc!");
+      alert("Vui lòng nhập tên bài hát và chọn file nhạc!");
     }
   };
-  
 
   // Xóa bài hát
-  // Xóa bài hát
-const handleDeleteSong = async (id: number) => {
-  try {
-    const response = await fetch(`http://localhost:8000/api/songs/delete/${id}`, {
-      method: 'DELETE',
-    });
+  const handleDeleteSong = async (id: number) => {
+    try {
+      const response = await fetch(
+        `http://localhost:8000/api/songs/delete/${id}`,
+        {
+          method: "DELETE",
+        }
+      );
 
-    if (response.ok) {
-      // Nếu xóa thành công, cập nhật lại danh sách bài hát
-      setSongs(songs.filter((song) => song.id !== id));
-      alert('Bài hát đã được xóa thành công!');
-    } else {
-      const data = await response.json();
-      alert(`Lỗi khi xóa bài hát: ${data.message}`);
+      if (response.ok) {
+        // Nếu xóa thành công, cập nhật lại danh sách bài hát
+        setSongs(songs.filter((song) => song.id !== id));
+        alert("Bài hát đã được xóa thành công!");
+      } else {
+        const data = await response.json();
+        alert(`Lỗi khi xóa bài hát: ${data.message}`);
+      }
+    } catch (error) {
+      console.error("Error deleting song:", error);
+      alert("Có lỗi xảy ra khi xóa bài hát.");
     }
-  } catch (error) {
-    console.error('Error deleting song:', error);
-    alert('Có lỗi xảy ra khi xóa bài hát.');
-  }
-};
-
+  };
 
   // Sửa bài hát
   const handleEditSong = (song: Song) => {
@@ -170,7 +175,7 @@ const handleDeleteSong = async (id: number) => {
         // Lấy metadata của file mới
         const audio = new Audio(newFileUrl);
         audio.addEventListener("loadedmetadata", () => {
-          newDuration =  Math.round(audio.duration);
+          newDuration = Math.round(audio.duration);
           console.log();
           updateSong(newFileUrl, newImageUrl, newDuration);
         });
@@ -197,7 +202,7 @@ const handleDeleteSong = async (id: number) => {
     fileUrl: string,
     imageUrl: string | undefined,
     duration: number | undefined
-    ) => {
+  ) => {
     const formData = new FormData();
     formData.append("songName", songTitle);
     formData.append("author", songAuthor);
@@ -251,30 +256,34 @@ const handleDeleteSong = async (id: number) => {
   const fetchSongs = async () => {
     try {
       // Gọi API để lấy danh sách bài hát
-      const response = await fetch('http://127.0.0.1:8000/api/songs');
+      const response = await fetch("http://127.0.0.1:8000/api/songs");
       const data = await response.json();
       // Kiểm tra xem có dữ liệu bài hát không
       if (data.message === "Songs retrieved successfully") {
         console.log(data.songs);
         setSongs(
-          data.songs.map((song: any) => ({
-            id : song.SongID,
-            title: song.Title,
-            author: song.Title, 
-            imageUrl: "", 
-            fileUrl: `http://localhost:8000/storage/${song.file.Path}`,
-            duration: song.Duration,
-          }))
+          Array.isArray(data.songs)
+            ? data.songs.map((song: Record<string, any>) => ({
+                id: song?.SongID ?? null,
+                title: song?.Title ?? "Không rõ tiêu đề",
+                author: song?.user?.FullName ?? "Không rõ tác giả",
+                imageUrl: "",
+                fileUrl: song?.file?.Path
+                  ? `http://localhost:8000/storage/${song.file.Path}`
+                  : "",
+                duration: song?.Duration ?? "00:00",
+              }))
+            : []
         );
       } else {
-        console.error('Lỗi khi lấy dữ liệu bài hát:', data.message);
+        console.error("Lỗi khi lấy dữ liệu bài hát:", data.message);
       }
     } catch (error) {
-      console.error('Lỗi khi kết nối đến API:', error);
+      console.error("Lỗi khi kết nối đến API:", error);
     }
   };
   useEffect(() => {
-    fetchSongs(); 
+    fetchSongs();
   }, []);
 
   return (
@@ -319,19 +328,6 @@ const handleDeleteSong = async (id: number) => {
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">
-                    Tên tác giả
-                  </label>
-                  <Input
-                    type="text"
-                    placeholder="Nhập tên tác giả"
-                    value={songAuthor}
-                    onChange={(e) => setSongAuthor(e.target.value)}
-                    className="border-blue-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white text-blue-900 placeholder-blue-400"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">
                     File bài hát
                   </label>
                   <Input
@@ -340,19 +336,6 @@ const handleDeleteSong = async (id: number) => {
                     ref={fileInputRef}
                     className="border-blue-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white text-blue-900"
                   />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">
-                    Ảnh bài hát
-                  </label>
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    ref={imageInputRef}
-                    className="border-blue-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white text-blue-900"
-                  />
-                  <p className="text-xs text-gray-500">(Tùy chọn)</p>
                 </div>
 
                 <Button
@@ -397,10 +380,15 @@ const handleDeleteSong = async (id: number) => {
                       src={song.fileUrl}
                       preload="metadata"
                       className="w-full"
+                      style={{ width: "300px" }}
+                      onError={(e) => {
+                        console.error("Audio error:", e);
+                        console.log("Failed URL:", song.fileUrl);
+                      }}
                     ></audio>
                     {song.duration && (
                       <span className="text-sm text-gray-500">
-                        {song.duration}
+                        {formatDuration(song.duration)}
                       </span>
                     )}
                   </div>
@@ -444,19 +432,6 @@ const handleDeleteSong = async (id: number) => {
                 placeholder="Nhập tên bài hát"
                 value={songTitle}
                 onChange={(e) => setSongTitle(e.target.value)}
-                className="border-blue-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white text-blue-900 placeholder-blue-400"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">
-                Tên tác giả
-              </label>
-              <Input
-                type="text"
-                placeholder="Nhập tên tác giả"
-                value={songAuthor}
-                onChange={(e) => setSongAuthor(e.target.value)}
                 className="border-blue-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white text-blue-900 placeholder-blue-400"
               />
             </div>

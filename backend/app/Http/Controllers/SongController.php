@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Http\Request;
 
@@ -55,8 +56,11 @@ class SongController extends Controller
                 'ReleaseCategoryID' => $request->input('releaseCategoryId'),
                 'CreatedAt' => now(),
                 'FileID' => $this->songService->uploadFile($request->file('file')),
+                'UserID' => 5,
             ];
             $this->songService->createSong($data);
+            // $User = User::find($request->author);
+            // $FullName = $User->FullName;
 
             return response()->json([
                 'message' => 'Song created successfully',
@@ -64,6 +68,7 @@ class SongController extends Controller
                     'songName' => $request->input('songName'),
                     'idAlbum' => $request->input('idAlbum'),
                     'duration' => $request->input('duration'),
+                    'FullName' => "fdfdfd"
                 ],
             ], 201);
         } catch (\Exception $e) {
