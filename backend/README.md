@@ -46,7 +46,7 @@ sudo mv composer.phar /usr/local/bin/composer
 
 ```bash
 git clone [repository-url]
-cd [project-folder]
+cd backend
 ```
 
 ### 2. Install PHP dependencies
