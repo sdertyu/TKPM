@@ -2,15 +2,45 @@
 
 This guide will help you set up and run this Laravel project after pulling it from the repository.
 
-## Prerequisites
+## Complete Setup Instructions
 
-- PHP 8.0 or higher
-- Composer
-- MySQL or another database supported by Laravel
-- Node.js and NPM (for frontend assets)
-- Git
+### Installing Prerequisites
 
-## Installation Steps
+#### 1. Install PHP
+
+**For Windows:**
+- Download the PHP installer from [windows.php.net](https://windows.php.net/download/)
+- Select PHP 8.0 or higher
+- Run the installer and follow the instructions
+- Add PHP to your system PATH
+- Enable required extensions in php.ini (uncomment extensions: fileinfo, pdo_pgsql, mbstring, openssl, pdo)
+
+**For macOS:**
+```bash
+brew install php
+```
+
+**For Linux (Ubuntu/Debian):**
+```bash
+sudo apt update
+sudo apt install php8.1 php8.1-common php8.1-mbstring php8.1-xml php8.1-pgsql php8.1-curl php8.1-zip
+```
+
+#### 2. Install Composer
+
+**For Windows:**
+- Download and run the Composer installer from [getcomposer.org](https://getcomposer.org/download/)
+- Follow the installation wizard
+
+**For macOS/Linux:**
+```bash
+php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+php composer-setup.php
+php -r "unlink('composer-setup.php');"
+sudo mv composer.phar /usr/local/bin/composer
+```
+
+### Project Setup
 
 ### 1. Clone the repository (if not already done)
 
@@ -28,53 +58,16 @@ composer install
 ### 3. Create environment file
 
 ```bash
-cp .env.example .env
+download env from zalo to backend folder
 ```
 
-### 4. Configure your .env file
-
-Edit the `.env` file to set up your database connection:
-
-```
-DB_CONNECTION=pgsql
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=your_database_name
-DB_USERNAME=your_database_username
-DB_PASSWORD=your_database_password
-```
-
-### 5. Generate application key
+### 4. Generate application key
 
 ```bash
 php artisan key:generate
 ```
 
-### 6. Run database migrations
-
-```bash
-php artisan migrate
-```
-
-### 7. Seed the database (if applicable)
-
-```bash
-php artisan db:seed
-```
-
-### 8. Install frontend dependencies (if applicable)
-
-```bash
-npm install
-```
-
-### 9. Compile frontend assets (if applicable)
-
-```bash
-npm run dev
-```
-
-### 10. Start the development server
+### 5. Start the development server
 
 ```bash
 php artisan serve
