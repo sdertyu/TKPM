@@ -1,4 +1,5 @@
 "use client";
+import React, { useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -24,7 +25,7 @@ interface Song {
   author: string;
   fileUrl: string; // URL của file nhạc
   imageUrl?: string; // URL của ảnh đại diện bài hát
-  duration?: string; // Thời gian bài hát (mm:ss)
+  duration?: number; // Thời gian bài hát (mm:ss)
 }
 
 export default function Home() {
@@ -47,7 +48,7 @@ export default function Home() {
   };
 
   // Thêm bài hát mới
-  const handleAddSong = () => {
+  const handleAddSong = async () => {
     if (
       fileInputRef.current?.files &&
       fileInputRef.current.files[0] &&
@@ -55,31 +56,62 @@ export default function Home() {
       songAuthor
     ) {
       const file = fileInputRef.current.files[0];
-      const fileUrl = URL.createObjectURL(file);
+      console.log(file)
       const imageFile = imageInputRef.current?.files?.[0];
+  
+      const fileUrl = URL.createObjectURL(file);
       const imageUrl = imageFile ? URL.createObjectURL(imageFile) : undefined;
-
-      // Tạo audio element tạm để lấy metadata
+  
       const audio = new Audio(fileUrl);
-      audio.addEventListener("loadedmetadata", () => {
+  
+      audio.addEventListener("loadedmetadata", async () => {
         const duration = formatDuration(audio.duration);
-        const newSong: Song = {
-          id: songs.length + 1,
-          title: songTitle,
-          author: songAuthor,
-          fileUrl,
-          imageUrl,
-          duration,
-        };
-        setSongs([...songs, newSong]);
-        // Reset input và đóng dialog
-        setSongTitle("");
-        setSongAuthor("");
-        fileInputRef.current!.value = "";
-        if (imageInputRef.current) imageInputRef.current.value = "";
-        setIsAddDialogOpen(false);
+  
+        // ✅ Gửi lên server (nếu cần)
+        const formData = new FormData();
+        formData.append("songName", songTitle);
+        formData.append("author", songAuthor); // nếu backend có
+        formData.append("duration", Math.floor(audio.duration).toString());
+        formData.append("file", file);
+        formData.append("idAlbum", "1");
+        formData.append("releaseCategoryId","1");
+        if (imageFile) formData.append("image", imageFile); // nếu có image
+  
+        try {
+          const response = await fetch("http://127.0.0.1:8000/api/songs/create", {
+            method: "POST",
+            body: formData,
+          });
+  
+          const data = await response.json();
+          if (data.message === "Song created successfully") {
+            const newSong: Song = {
+              id: data.song.SongID, // giả sử server trả về bài hát mới
+              title: data.song.Title,
+              author: data.song.Title,
+              fileUrl: `http://localhost:8000/storage/` + data.song.file?.Path || fileUrl,
+              imageUrl: imageUrl || "", 
+              duration: data.song.Duration.toString(),
+            };
+  
+            setSongs([...songs, newSong]);
+            alert("Đã thêm bài hát!");
+  
+            // Reset form
+            setSongTitle("");
+            setSongAuthor("");
+            fileInputRef.current!.value = "";
+            if (imageInputRef.current) imageInputRef.current.value = "";
+            setIsAddDialogOpen(false);
+          } else {
+            alert("Thêm bài hát thất bại!");
+          }
+        } catch (error) {
+          console.error("Error adding song:", error);
+          alert("Có lỗi xảy ra khi thêm bài hát.");
+        }
       });
-
+  
       audio.addEventListener("error", () => {
         alert("File nhạc không hợp lệ hoặc không được hỗ trợ!");
       });
@@ -87,11 +119,30 @@ export default function Home() {
       alert("Vui lòng nhập đầy đủ thông tin và chọn file nhạc!");
     }
   };
+  
 
   // Xóa bài hát
-  const handleDeleteSong = (id: number) => {
-    setSongs(songs.filter((song) => song.id !== id));
-  };
+  // Xóa bài hát
+const handleDeleteSong = async (id: number) => {
+  try {
+    const response = await fetch(`http://localhost:8000/api/songs/delete/${id}`, {
+      method: 'DELETE',
+    });
+
+    if (response.ok) {
+      // Nếu xóa thành công, cập nhật lại danh sách bài hát
+      setSongs(songs.filter((song) => song.id !== id));
+      alert('Bài hát đã được xóa thành công!');
+    } else {
+      const data = await response.json();
+      alert(`Lỗi khi xóa bài hát: ${data.message}`);
+    }
+  } catch (error) {
+    console.error('Error deleting song:', error);
+    alert('Có lỗi xảy ra khi xóa bài hát.');
+  }
+};
+
 
   // Sửa bài hát
   const handleEditSong = (song: Song) => {
@@ -119,7 +170,8 @@ export default function Home() {
         // Lấy metadata của file mới
         const audio = new Audio(newFileUrl);
         audio.addEventListener("loadedmetadata", () => {
-          newDuration = formatDuration(audio.duration);
+          newDuration =  Math.round(audio.duration);
+          console.log();
           updateSong(newFileUrl, newImageUrl, newDuration);
         });
 
@@ -141,32 +193,89 @@ export default function Home() {
     }
   };
 
-  const updateSong = (
+  const updateSong = async (
     fileUrl: string,
     imageUrl: string | undefined,
-    duration: string | undefined
-  ) => {
-    setSongs(
-      songs.map((song) =>
-        song.id === editSongId
-          ? {
-              ...song,
-              title: songTitle,
-              author: songAuthor,
-              fileUrl,
-              imageUrl,
-              duration,
-            }
-          : song
-      )
-    );
-    setEditSongId(null);
-    setSongTitle("");
-    setSongAuthor("");
-    if (editFileInputRef.current) editFileInputRef.current.value = "";
-    if (editImageInputRef.current) editImageInputRef.current.value = "";
-    setIsEditDialogOpen(false);
+    duration: number | undefined
+    ) => {
+    const formData = new FormData();
+    formData.append("songName", songTitle);
+    formData.append("author", songAuthor);
+    formData.append("duration", duration !== undefined ? String(duration) : "");
+    formData.append("file", editFileInputRef.current?.files?.[0] || "");
+    formData.append("image", editImageInputRef.current?.files?.[0] || "");
+    formData.append("idAlbum", "1"); // Giả sử bạn vẫn giữ album ID là 1
+    formData.append("releaseCategoryId", "1"); // Giả sử bạn vẫn giữ release category ID là 1
+
+    try {
+      const response = await fetch(
+        `http://localhost:8000/api/songs/update/${editSongId}`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+      const data = await response.json();
+
+      if (data.message === "Song updated successfully") {
+        // Cập nhật bài hát trong state sau khi thành công
+        setSongs(
+          songs.map((song) =>
+            song.id === editSongId
+              ? {
+                  ...song,
+                  title: songTitle,
+                  author: songAuthor,
+                  fileUrl,
+                  imageUrl,
+                  duration,
+                }
+              : song
+          )
+        );
+        setEditSongId(null);
+        setSongTitle("");
+        setSongAuthor("");
+        if (editFileInputRef.current) editFileInputRef.current.value = "";
+        if (editImageInputRef.current) editImageInputRef.current.value = "";
+        setIsEditDialogOpen(false);
+        alert("Bài hát đã được cập nhật!");
+      } else {
+        alert("Cập nhật bài hát thất bại!");
+      }
+    } catch (error) {
+      console.error("Error updating song:", error);
+      alert("Có lỗi xảy ra khi cập nhật bài hát.");
+    }
   };
+  const fetchSongs = async () => {
+    try {
+      // Gọi API để lấy danh sách bài hát
+      const response = await fetch('http://127.0.0.1:8000/api/songs');
+      const data = await response.json();
+      // Kiểm tra xem có dữ liệu bài hát không
+      if (data.message === "Songs retrieved successfully") {
+        console.log(data.songs);
+        setSongs(
+          data.songs.map((song: any) => ({
+            id : song.SongID,
+            title: song.Title,
+            author: song.Title, 
+            imageUrl: "", 
+            fileUrl: `http://localhost:8000/storage/${song.file.Path}`,
+            duration: song.Duration,
+          }))
+        );
+      } else {
+        console.error('Lỗi khi lấy dữ liệu bài hát:', data.message);
+      }
+    } catch (error) {
+      console.error('Lỗi khi kết nối đến API:', error);
+    }
+  };
+  useEffect(() => {
+    fetchSongs(); 
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex flex-col">
