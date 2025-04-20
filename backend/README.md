@@ -61,13 +61,7 @@ composer install
 download env from zalo to backend folder
 ```
 
-### 4. Generate application key
-
-```bash
-php artisan key:generate
-```
-
-### 5. Start the development server
+### 4. Start the development server
 
 ```bash
 php artisan serve
